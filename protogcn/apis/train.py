@@ -12,6 +12,18 @@ from ..core import DistEvalHook
 from ..datasets import build_dataloader, build_dataset
 from ..utils import cache_checkpoint, get_root_logger
 
+from mmcv.runner import Hook
+import torch
+
+class DeterministicToggleHook(Hook):
+    def before_train_epoch(self, runner):
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+    def after_train_epoch(self, runner):
+        torch.backends.cudnn.deterministic = False
+        torch.backends.cudnn.benchmark = True   
+    
 
 def init_random_seed(seed=None, device='cuda'):
     """Initialize random seed.
@@ -115,7 +127,36 @@ def train_model(model,
     runner.register_training_hooks(cfg.lr_config, optimizer_config,
                                    cfg.checkpoint_config, cfg.log_config,
                                    cfg.get('momentum_config', None))
+    """
+    Details of register_training_hooks
+    See:
+        * https://mmcv.readthedocs.io/en/v1.3.9/_modules/mmcv/runner/base_runner.html#:~:text=def%20register_training_hooks(self%2C
+        * https://mmcv.readthedocs.io/en/master/search.html?q=LrUpdaterHook&check_keywords=yes&area=default
+        
+    def register_lr_hook(self, lr_config):
+        if lr_config is None:
+            return
+        elif isinstance(lr_config, dict):
+            assert 'policy' in lr_config
+            policy_type = lr_config.pop('policy')
+            # If the type of policy is all in lower case, e.g., 'cyclic',
+            # then its first letter will be capitalized, e.g., to be 'Cyclic'.
+            # This is for the convenient usage of Lr updater.
+            # Since this is not applicable for `
+            # CosineAnnealingLrUpdater`,
+            # the string will not be changed if it contains capital letters.
+            if policy_type == policy_type.lower():
+                policy_type = policy_type.title()
+            hook_type = policy_type + 'LrUpdaterHook'
+            lr_config['type'] = hook_type
+            hook = mmcv.build_from_cfg(lr_config, HOOKS)
+        else:
+            hook = lr_config
+        self.register_hook(hook, priority='VERY_HIGH')
+    """
     runner.register_hook(DistSamplerSeedHook())
+    if cfg.get("enable_deterministic_hook", False):
+        runner.register_hook(DeterministicToggleHook(), priority='VERY_HIGH')
 
     eval_hook = None
     if validate:
@@ -129,6 +170,9 @@ def train_model(model,
         dataloader_setting = dict(dataloader_setting,
                                   **cfg.data.get('val_dataloader', {}))
         val_dataloader = build_dataloader(val_dataset, **dataloader_setting)
+        eval_cfg['work_dir'] = cfg.get('work_dir', None)
+        eval_cfg['seed'] = cfg.seed
+        eval_cfg['runner'] = runner
         eval_hook = DistEvalHook(val_dataloader, **eval_cfg)
         runner.register_hook(eval_hook)
 

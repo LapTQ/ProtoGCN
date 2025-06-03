@@ -1,14 +1,13 @@
 import numpy as np
 from mmcv.runner import DistEvalHook as BasicDistEvalHook
+from sklearn.metrics import recall_score
 
 
 class DistEvalHook(BasicDistEvalHook):
-    greater_keys = [
-        'acc', 'top', 'AR@', 'auc', 'precision', 'mAP@', 'Recall@'
-    ]
-    less_keys = ['loss']
+    greater_keys = ["acc", "top", "AR@", "auc", "precision", "mAP@", "Recall@"]
+    less_keys = ["loss"]
 
-    def __init__(self, *args, save_best='auto', seg_interval=None, **kwargs):
+    def __init__(self, *args, save_best="auto", seg_interval=None, **kwargs):
         super().__init__(*args, save_best=save_best, **kwargs)
         self.seg_interval = seg_interval
         if seg_interval is not None:
@@ -49,27 +48,22 @@ def confusion_matrix(y_pred, y_real, normalize=None):
     Returns:
         np.ndarray: Confusion matrix.
     """
-    if normalize not in ['true', 'pred', 'all', None]:
-        raise ValueError("normalize must be one of {'true', 'pred', "
-                         "'all', None}")
+    if normalize not in ["true", "pred", "all", None]:
+        raise ValueError("normalize must be one of {'true', 'pred', " "'all', None}")
 
     if isinstance(y_pred, list):
         y_pred = np.array(y_pred)
     if not isinstance(y_pred, np.ndarray):
-        raise TypeError(
-            f'y_pred must be list or np.ndarray, but got {type(y_pred)}')
+        raise TypeError(f"y_pred must be list or np.ndarray, but got {type(y_pred)}")
     if not y_pred.dtype == np.int64:
-        raise TypeError(
-            f'y_pred dtype must be np.int64, but got {y_pred.dtype}')
+        raise TypeError(f"y_pred dtype must be np.int64, but got {y_pred.dtype}")
 
     if isinstance(y_real, list):
         y_real = np.array(y_real)
     if not isinstance(y_real, np.ndarray):
-        raise TypeError(
-            f'y_real must be list or np.ndarray, but got {type(y_real)}')
+        raise TypeError(f"y_real must be list or np.ndarray, but got {type(y_real)}")
     if not y_real.dtype == np.int64:
-        raise TypeError(
-            f'y_real dtype must be np.int64, but got {y_real.dtype}')
+        raise TypeError(f"y_real dtype must be np.int64, but got {y_real.dtype}")
 
     label_set = np.unique(np.concatenate((y_pred, y_real)))
     num_labels = len(label_set)
@@ -82,18 +76,16 @@ def confusion_matrix(y_pred, y_real, normalize=None):
     y_real_mapped = label_map[y_real]
 
     confusion_mat = np.bincount(
-        num_labels * y_real_mapped + y_pred_mapped,
-        minlength=num_labels**2).reshape(num_labels, num_labels)
+        num_labels * y_real_mapped + y_pred_mapped, minlength=num_labels**2
+    ).reshape(num_labels, num_labels)
 
-    with np.errstate(all='ignore'):
-        if normalize == 'true':
-            confusion_mat = (
-                confusion_mat / confusion_mat.sum(axis=1, keepdims=True))
-        elif normalize == 'pred':
-            confusion_mat = (
-                confusion_mat / confusion_mat.sum(axis=0, keepdims=True))
-        elif normalize == 'all':
-            confusion_mat = (confusion_mat / confusion_mat.sum())
+    with np.errstate(all="ignore"):
+        if normalize == "true":
+            confusion_mat = confusion_mat / confusion_mat.sum(axis=1, keepdims=True)
+        elif normalize == "pred":
+            confusion_mat = confusion_mat / confusion_mat.sum(axis=0, keepdims=True)
+        elif normalize == "all":
+            confusion_mat = confusion_mat / confusion_mat.sum()
         confusion_mat = np.nan_to_num(confusion_mat)
 
     return confusion_mat
@@ -116,12 +108,13 @@ def mean_class_accuracy(scores, labels):
     cls_hit = np.diag(cf_mat)
 
     mean_class_acc = np.mean(
-        [hit / cnt if cnt else 0.0 for cnt, hit in zip(cls_cnt, cls_hit)])
+        [hit / cnt if cnt else 0.0 for cnt, hit in zip(cls_cnt, cls_hit)]
+    )
 
     return mean_class_acc
 
 
-def top_k_accuracy(scores, labels, topk=(1, )):
+def top_k_accuracy(scores, labels, topk=(1,), **kwargs):
     """Calculate top k accuracy score.
 
     Args:
@@ -132,15 +125,75 @@ def top_k_accuracy(scores, labels, topk=(1, )):
     Returns:
         list[float]: Top k accuracy score for each k.
     """
+    class_map = kwargs.get("class_map", None)
+    if class_map is None:
+        class_map = np.arange(len(scores[0]))
+    else:
+        assert len(class_map) == len(scores[0])
+        class_map = np.array(class_map)
     res = []
     labels = np.array(labels)[:, np.newaxis]
     for k in topk:
-        max_k_preds = np.argsort(scores, axis=1)[:, -k:][:, ::-1]
+        max_k_preds = class_map[np.argsort(scores, axis=1)][:, -k:][:, ::-1]
         match_array = np.logical_or.reduce(max_k_preds == labels, axis=1)
         topk_acc_score = match_array.sum() / match_array.shape[0]
         res.append(topk_acc_score)
 
     return res
+
+
+def harmonic_mean_recall(scores, labels, **kwargs):
+    class_map = kwargs.get("class_map", None)
+    if class_map is None:
+        class_map = np.arange(len(scores[0]))
+    else:
+        assert len(class_map) == len(scores[0])
+        class_map = np.array(class_map)
+    y_true = labels
+    y_pred = class_map[np.array(scores).argsort()[:, -1]]
+
+    class_weights = kwargs["class_weights"]
+    per_class_recall = recall_score(y_true, y_pred, average=None)
+
+    if class_weights is None:
+        class_weights = np.ones_like(per_class_recall)
+    else:
+        class_weights = np.array(class_weights)
+    
+    assert len(class_weights) == len(per_class_recall), f"Number of weights ({len(class_weights)}) must match number of classes ({len(per_class_recall)})"
+    
+    # (If a class has 0 recall but weight is 0, we can safely ignore it)
+    if np.any((per_class_recall == 0) & (class_weights > 0)):
+        return 0.0
+
+    # We only compute for classes where weight > 0 to avoid division by zero errors
+    # or 0/0 ambiguity for ignored classes.
+    active_indices = class_weights > 0
+
+    active_weights = class_weights[active_indices]
+    active_recalls = per_class_recall[active_indices]
+
+    active_weights = active_weights * active_weights
+    harmonic_mean = np.sum(active_weights) / np.sum(active_weights / active_recalls)
+
+    return harmonic_mean.item()
+
+
+def recall_macro(scores, labels, **kwargs):
+    class_map = kwargs.get("class_map", None)
+    if class_map is None:
+        class_map = np.arange(len(scores[0]))
+    else:
+        assert len(class_map) == len(scores[0])
+        class_map = np.array(class_map)
+    y_true = labels
+    y_pred = class_map[np.array(scores).argsort()[:, -1]]
+
+    class_weights = kwargs["class_weights"]
+    assert class_weights is None, "Recall macro is not supported with class weights by LapTQ"
+
+    recall = recall_score(y_true, y_pred, average="macro")
+    return recall
 
 
 def mean_average_precision(scores, labels):
@@ -189,9 +242,9 @@ def binary_precision_recall_curve(y_score, y_true):
     assert y_score.shape == y_true.shape
 
     # make y_true a boolean vector
-    y_true = (y_true == 1)
+    y_true = y_true == 1
     # sort scores and corresponding truth values
-    desc_score_indices = np.argsort(y_score, kind='mergesort')[::-1]
+    desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
     y_score = y_score[desc_score_indices]
     y_true = y_true[desc_score_indices]
     # There may be ties in values, therefore find the `distinct_value_inds`

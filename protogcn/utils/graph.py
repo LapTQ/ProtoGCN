@@ -72,7 +72,7 @@ class Graph:
         self.nx_node = nx_node
 
         assert nx_node == 1 or mode == 'random', "nx_node can be > 1 only if mode is 'random'"
-        assert layout in ['nturgb+d', 'openpose', 'openpose_new', 'coco', 'coco_new']
+        assert layout in ['nturgb+d', 'openpose', 'openpose_new', 'coco', 'coco_new', "coco_onlyhand", 'coco_headless']
 
         self.get_layout(layout)
         self.hop_dis = get_hop_distance(self.num_node, self.inward, max_hop)
@@ -126,6 +126,32 @@ class Graph:
                 (1, 0), (3, 1), (2, 0), (4, 2), (0, 19), (17, 18), (18, 19)
             ]
             self.center = 19
+        elif layout == 'coco_onlyhand':
+            self.num_node = 6
+            self.inward = [
+                (0, 1),
+                (0, 2),
+                (1, 3),
+                (2, 4),
+                (3, 5),
+            ]
+            self.center = 0
+        elif layout == 'coco_headless':
+            self.num_node = 12
+            self.inward = [
+                (0, 1),
+                (0, 2),
+                (1, 3),
+                (2, 4),
+                (3, 5),
+                (0, 6),
+                (1, 7),
+                (6, 7),
+                (6, 8),
+                (7, 9),
+                (8, 10),
+                (9, 11),
+            ]
         else:
             raise ValueError(f'Do Not Exist This Layout: {layout}')
         self.self_link = [(i, i) for i in range(self.num_node)]

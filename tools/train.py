@@ -5,21 +5,24 @@ import os.path as osp
 import time
 import torch
 import torch.distributed as dist
-from mmcv import Config
-from mmcv import digit_version as dv
-from mmcv.runner import get_dist_info, init_dist, set_random_seed
-from mmcv.utils import get_git_hash
+from mmengine import Config
+from mmengine.utils import digit_version as dv
+from mmengine.dist import get_dist_info, init_dist
+from mmengine.runner import set_random_seed
+from mmengine.utils import get_git_hash
 
 from protogcn import __version__
 from protogcn.apis import init_random_seed, train_model
 from protogcn.datasets import build_dataset
 from protogcn.models import build_model
 from protogcn.utils import collect_env, get_root_logger, mc_off, mc_on, test_port
+from copy import deepcopy
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a recognizer')
     parser.add_argument('config', help='train config file path')
+    parser.add_argument('--seed', type=int, default=None, help='random seed')
     parser.add_argument(
         '--validate',
         action='store_true',
@@ -32,7 +35,6 @@ def parse_args():
         '--test-best',
         action='store_true',
         help='whether to test the best checkpoint (if applicable) after training')
-    parser.add_argument('--seed', type=int, default=None, help='random seed')
     parser.add_argument(
         '--deterministic',
         action='store_true',
@@ -48,6 +50,7 @@ def parse_args():
         help='whether to compile the model before training / testing (only available in pytorch 2.0)')
     parser.add_argument('--local_rank', type=int, default=-1)
     parser.add_argument('--local-rank', type=int, default=-1)
+    parser.add_argument('--id_model', type=int)
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -55,9 +58,7 @@ def parse_args():
     return args
 
 
-def main():
-    args = parse_args()
-
+def main(args):
     cfg = Config.fromfile(args.config)
 
     # set cudnn_benchmark
@@ -69,13 +70,20 @@ def main():
     if cfg.get('work_dir', None) is None:
         # use config filename as default work_dir if cfg.work_dir is None
         cfg.work_dir = osp.join('./work_dirs', osp.splitext(osp.basename(args.config))[0])
-
+    
     if not hasattr(cfg, 'dist_params'):
         cfg.dist_params = dict(backend='nccl')
 
     init_dist(args.launcher, **cfg.dist_params)
     rank, world_size = get_dist_info()
     cfg.gpu_ids = range(world_size)
+
+    id_model = args.id_model
+    print("\n\n##############################################################")
+    print(f"#                     ROUND {id_model}                               #")
+    print("##############################################################\n")
+    
+    cfg.work_dir = osp.join(cfg.work_dir, f'model_{id_model}')
 
     auto_resume = cfg.get('auto_resume', True)
     if auto_resume and cfg.get('resume_from', None) is None:
@@ -99,8 +107,7 @@ def main():
     env_info_dict = collect_env()
     env_info = '\n'.join([f'{k}: {v}' for k, v in env_info_dict.items()])
     dash_line = '-' * 60 + '\n'
-    logger.info('Environment info:\n' + dash_line + env_info + '\n' +
-                dash_line)
+    logger.info('Environment info:\n' + dash_line + env_info + '\n' + dash_line)
     meta['env_info'] = env_info
 
     # log some basic info
@@ -156,4 +163,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+    main(args)

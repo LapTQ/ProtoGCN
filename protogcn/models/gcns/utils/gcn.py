@@ -98,7 +98,11 @@ class unit_gcn(nn.Module):
         # N K C 1 V V = N K 1 1 V V + N K C 1 V V
         A = intra_graph + A
         graph_list.append(intra_graph)
-        A = A.squeeze(3)
+        
+        if A.size(3) == 1: # comment out if you don't have to convert to onnx
+            A = A.view(*(A.shape[:3] + A.shape[4:])).contiguous()
+        # A = A.squeeze(3)      # if you don't have to convert to onnx, then use this line instead
+
         # N K C T V = N K C T V * N K C V V
         x = torch.einsum('nkctv,nkcvw->nkctw', pre_x, A).contiguous()
         # N K C T V -> N K*C T V

@@ -13,7 +13,26 @@ def rgetattr(obj, attr, *args):
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
 
-    return functools.reduce(_getattr, [obj] + attr.split('.'))
+    return functools.reduce(_getattr, [obj] + attr.split("."))
+
+
+# class MultStreamBackbone(nn.Module):
+
+#     def __init__(self, **kwargs):
+#         super().__init__()
+#         num_streams = kwargs['num_streams']
+#         backbone = kwargs['backbone']
+
+#         self.backbones = nn.ModuleList([builder.build_backbone(backbone) for _ in range(num_streams)])
+
+#     def init_weights(self):
+#         for bb in self.backbones:
+#             bb.init_weights()
+
+#     def forward(self, xs):
+#         outs = [bb(x) for x in self.backbones]
+#         x = 
+
 
 
 class BaseRecognizer(nn.Module, metaclass=ABCMeta):
@@ -32,11 +51,9 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
         test_cfg (dict): Config for testing. Default: {}.
     """
 
-    def __init__(self,
-                 backbone,
-                 cls_head=None,
-                 train_cfg=dict(),
-                 test_cfg=dict()):
+    def __init__(
+        self, backbone, cls_head=None, train_cfg=dict(), test_cfg=dict(), **kwargs
+    ):
         super().__init__()
         self.backbone = builder.build_backbone(backbone)
         self.cls_head = builder.build_head(cls_head) if cls_head else None
@@ -52,13 +69,13 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
-        self.max_testing_views = test_cfg.get('max_testing_views', None)
+        self.max_testing_views = test_cfg.get("max_testing_views", None)
         self.init_weights()
 
     @property
     def with_cls_head(self):
         """bool: whether the recognizer has a cls_head"""
-        return hasattr(self, 'cls_head') and self.cls_head is not None
+        return hasattr(self, "cls_head") and self.cls_head is not None
 
     def init_weights(self):
         """Initialize the model network weights."""
@@ -91,16 +108,18 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
             torch.Tensor: Averaged class score.
         """
         assert len(cls_score.shape) == 3
-        average_clips = self.test_cfg.get('average_clips', 'prob')
-        if average_clips not in ['score', 'prob', None]:
-            raise ValueError(f'{average_clips} is not supported. Supported: ["score", "prob", None]')
+        average_clips = self.test_cfg.get("average_clips", "prob")
+        if average_clips not in ["score", "prob", None]:
+            raise ValueError(
+                f'{average_clips} is not supported. Supported: ["score", "prob", None]'
+            )
 
         if average_clips is None:
             return cls_score
 
-        if average_clips == 'prob':
+        if average_clips == "prob":
             return F.softmax(cls_score, dim=2).mean(dim=1)
-        elif average_clips == 'score':
+        elif average_clips == "score":
             return cls_score.mean(dim=1)
 
     @abstractmethod
@@ -131,11 +150,11 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
             elif isinstance(loss_value, list):
                 log_vars[loss_name] = sum(_loss.mean() for _loss in loss_value)
             else:
-                raise TypeError(f'{loss_name} is not a tensor or list of tensors')
+                raise TypeError(f"{loss_name} is not a tensor or list of tensors")
 
-        loss = sum(_value for _key, _value in log_vars.items() if 'loss' in _key)
+        loss = sum(_value for _key, _value in log_vars.items() if "loss" in _key)
 
-        log_vars['loss'] = loss
+        log_vars["loss"] = loss
         for loss_name, loss_value in log_vars.items():
             # reduce loss when distributed training
             if dist.is_available() and dist.is_initialized():
@@ -149,7 +168,7 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
         """Define the computation performed at every call."""
         if return_loss:
             if label is None:
-                raise ValueError('Label should not be None.')
+                raise ValueError("Label should not be None.")
             return self.forward_train(imgs, label, **kwargs)
 
         return self.forward_test(imgs, **kwargs)
@@ -187,6 +206,7 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
         outputs = dict(
             loss=loss,
             log_vars=log_vars,
-            num_samples=len(next(iter(data_batch.values()))))
+            num_samples=len(next(iter(data_batch.values()))),
+        )
 
         return outputs
