@@ -10,30 +10,38 @@ model_paths = OrderedDict(
     [
         (
             "j",
-            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v215--satudora_veo3_awlrecord--split-14-class--nodistinct--v2/model_0/best_harmonic_mean_recall_epoch_3.pth",
+            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v255.10_classes.2s-15frames.j/model_4/best_macro_f1_epoch_17.pth",
         ),
-        # (
-        #     "b",
-        #     "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v216--satudora_veo3_awlrecord--split-14-class--nodistinct--v2--b/model_7/best_harmonic_mean_recall_epoch_7.pth",
-        # ),
+        (
+            "b",
+            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v256.10_classes.2s-15frames.b/model_0/best_macro_f1_epoch_23.pth",
+        ),
         (
             "jm",
-            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v217--satudora_veo3_awlrecord--split-14-class--nodistinct--v2--jm/model_1/best_harmonic_mean_recall_epoch_4.pth",
+            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v257.10_classes.2s-15frames.jm/model_3/best_macro_f1_epoch_19.pth",
         ),
-        # (
-        #     "bm",
-        #     "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v218--satudora_veo3_awlrecord--split-14-class--nodistinct--v2--bm/model_7/best_harmonic_mean_recall_epoch_25.pth",
-        # ),
+        (
+            "bm",
+            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v258.10_classes.2s-15frames.bm/model_1/best_macro_f1_epoch_19.pth",
+        ),
     ]
 )
-pathf_output = "/home/laptq/laptq-fs26-shoplifting-detection/outputs/convert-torch-to-onnx/fs26/ProtoGCN/{}.onnx".format(
-    "--".join(
+pathf_output = "mydata/tmp/convert-torch-to-onnx/protogcn.{}.onnx".format(
+    "+".join(
         [
-            "{}-{}".format(path.split("/")[-3].split("--")[0], key)
+            "{}_{}".format(path.split("/")[-3].split(".")[0], key)
             for key, path in model_paths.items()
         ]
     )
 )
+
+
+dummy_input_shape = (5, 2, 15, 12)
+B, C, T, V = dummy_input_shape
+dummy_keypoint = torch.randn(dummy_input_shape)
+
+# Example inputs
+example_inputs = (dummy_keypoint,)
 
 ls_models = OrderedDict()
 for key, model_path in model_paths.items():
@@ -56,7 +64,7 @@ for key, model_path in model_paths.items():
             cls_head=dict(
                 type="SimpleHead",
                 joint_cfg="coco_headless",
-                num_classes=14,
+                num_classes=10,
                 in_channels=384,
                 weight=0.2,
             ),
@@ -106,31 +114,39 @@ class EnsembleModel(nn.Module):
 
         if self.model_j is not None:
             output_j, feat_j = get_output(self.model_j, x_j)
-            print(output_j.shape, feat_j.shape)
         else:
             output_j, feat_j = None, None
         if self.model_b is not None:
             output_b, feat_b = get_output(self.model_b, x_b)
-            print(output_b.shape, feat_b.shape)
         else:
             output_b, feat_b = None, None
         if self.model_jm is not None:
             output_jm, feat_jm = get_output(self.model_jm, x_jm)
-            print(output_jm.shape, feat_jm.shape)
         else:
             output_jm, feat_jm = None, None
         if self.model_bm is not None:
             output_bm, feat_bm = get_output(self.model_bm, x_bm)
-            print(output_bm.shape, feat_bm.shape)
         else:
             output_bm, feat_bm = None, None
         return [
             i
             for p in [
-                [output_j, feat_j],
-                [output_b, feat_b],
-                [output_jm, feat_jm],
-                [output_bm, feat_bm],
+                [
+                    output_j, 
+                    # feat_j,
+                ],
+                [
+                    output_b, 
+                    # feat_b,
+                ],
+                [
+                    output_jm, 
+                    # feat_jm,
+                ],
+                [
+                    output_bm, 
+                    # feat_bm,
+                ],
             ]
             for i in p
             if p[0] is not None
@@ -150,13 +166,17 @@ def get_output(model, x):
 
 model = EnsembleModel(ls_models)
 
-
-dummy_input_shape = (5, 2, 15, 12)
-B, C, T, V = dummy_input_shape
-dummy_keypoint = torch.randn(dummy_input_shape)
-
-# Example inputs
-example_inputs = (dummy_keypoint,)
+output_names = [
+    it
+    for p in [
+        (
+            f"output_{key}",
+            # f"feat_{key}",
+        )
+        for key in ls_models.keys()
+    ]
+    for it in p
+]
 
 os.makedirs(os.path.dirname(pathf_output), exist_ok=True)
 # Export to ONNX
@@ -167,20 +187,12 @@ torch.onnx.export(
     input_names=[
         "input1",
     ],
-    output_names=[
-        it
-        for p in [(f"output_{key}", f"feat_{key}") for key in ls_models.keys()]
-        for it in p
-    ],
+    output_names=output_names,
     dynamic_axes={
         "input1": {
             0: "batch_size",
         },
-        **{
-            it: {0: "batch_size"}
-            for p in [(f"output_{key}", f"feat_{key}") for key in ls_models.keys()]
-            for it in p
-        },
+        **{it: {0: "batch_size"} for it in output_names},
     },
     opset_version=12,
 )
@@ -233,10 +245,6 @@ print(
         inputs={
             "input1": np.random.randn(13, 2, 15, 12),
         },
-        output_names=[
-            it
-            for p in [(f"output_{key}", f"feat_{key}") for key in ls_models.keys()]
-            for it in p
-        ],
+        output_names=output_names,
     )
 )

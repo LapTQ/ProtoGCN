@@ -106,7 +106,7 @@ class RecognizerGCN(BaseRecognizer):
                 raise ValueError("Label should not be None.")
             return self.forward_train(keypoint, label, **kwargs)
 
-        return self.forward_test(keypoint, to_numpy=to_numpy, **kwargs)
+        return self.forward_test(keypoint, to_numpy=to_numpy, return_feat=return_feat, **kwargs)
 
     def extract_feat(self, keypoint):
 

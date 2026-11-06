@@ -1,10 +1,10 @@
 import numpy as np
 from mmcv.runner import DistEvalHook as BasicDistEvalHook
-from sklearn.metrics import recall_score
+from sklearn.metrics import recall_score, f1_score
 
 
 class DistEvalHook(BasicDistEvalHook):
-    greater_keys = ["acc", "top", "AR@", "auc", "precision", "mAP@", "Recall@"]
+    greater_keys = ["acc", "top", "AR@", "auc", "precision", "mAP@", "Recall@", "macro_f1"]
     less_keys = ["loss"]
 
     def __init__(self, *args, save_best="auto", seg_interval=None, **kwargs):
@@ -194,6 +194,34 @@ def recall_macro(scores, labels, **kwargs):
 
     recall = recall_score(y_true, y_pred, average="macro")
     return recall
+
+
+def macro_f1(scores, labels, **kwargs):
+    scores_arr = np.array(scores)
+    if scores_arr.ndim == 1:
+        scores_arr = scores_arr[np.newaxis, :]
+    num_classes = scores_arr.shape[1]
+
+    class_map = kwargs.get("class_map", None)
+    if class_map is None:
+        class_map = np.arange(num_classes)
+    else:
+        assert len(class_map) == num_classes
+        class_map = np.array(class_map)
+    y_true = labels
+    y_pred = class_map[scores_arr.argmax(axis=1)]
+
+    class_weights = kwargs.get("class_weights", None)
+    assert class_weights is None, "macro_f1 is not supporting class weights by LapTQ"
+
+    f1 = f1_score(
+        y_true,
+        y_pred,
+        labels=class_map,
+        average="macro",
+        zero_division=0,
+    )
+    return float(f1)
 
 
 def mean_average_precision(scores, labels):

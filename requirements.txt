@@ -11,5 +11,6 @@ opencv-python
 importlib_metadata
 pymemcache
 scipy
+scikit-learn
 # torch>=1.5
 tqdm

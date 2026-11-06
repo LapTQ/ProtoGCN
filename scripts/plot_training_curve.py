@@ -473,20 +473,20 @@ def main():
 
     model_configs = [
         (
-            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v219--satudora_veo3_awlrecord--split-14-class--nodistinct--2s-15frames--v2",
-            "v219",
+            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v223--satudora_veo3_awlset1set2set3_107cia--split-14-class--nodistinct--2s-15frames--j--v2",
+            "v223",
         ),
         (
-            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v220--satudora_veo3_awlrecord--split-14-class--nodistinct--2s-15frames--v2--b",
-            "v220",
+            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v224--satudora_veo3_awlset1set2set3_107cia--split-14-class--nodistinct--2s-15frames--b--v2",
+            "v224",
         ),
         (
-            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v221--satudora_veo3_awlrecord--split-14-class--nodistinct--2s-15frames--v2--jm",
-            "v221",
+            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v225--satudora_veo3_awlset1set2set3_107cia--split-14-class--nodistinct--2s-15frames--jm--v2",
+            "v225",
         ),
         (
-            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v222--satudora_veo3_awlrecord--split-14-class--nodistinct--2s-15frames--v2--bm",
-            "v222",
+            "/home/laptq/laptq-fs26-shoplifting-detection/runs/ProtoGCN/fs26/v226--satudora_veo3_awlset1set2set3_107cia--split-14-class--nodistinct--2s-15frames--bm--v2",
+            "v226",
         )
     ]
     # metric_name = "top1_acc"
