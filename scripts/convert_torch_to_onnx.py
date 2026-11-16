@@ -10,19 +10,19 @@ model_paths = OrderedDict(
     [
         (
             "j",
-            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v255.10_classes.2s-15frames.j/model_4/best_macro_f1_epoch_17.pth",
+            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v259.10_classes.2s-15frames.j.filter_dbscan_95/model_0/best_macro_f1_epoch_12.pth",
         ),
         (
             "b",
-            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v256.10_classes.2s-15frames.b/model_0/best_macro_f1_epoch_23.pth",
+            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v260.10_classes.2s-15frames.b.filter_dbscan_95/model_2/best_macro_f1_epoch_50.pth",
         ),
         (
             "jm",
-            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v257.10_classes.2s-15frames.jm/model_3/best_macro_f1_epoch_19.pth",
+            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v261.10_classes.2s-15frames.jm.filter_dbscan_95/model_1/best_macro_f1_epoch_24.pth",
         ),
         (
             "bm",
-            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v258.10_classes.2s-15frames.bm/model_1/best_macro_f1_epoch_19.pth",
+            "mymodels/checkpoints/fs26/action_recognition/ProtoGCN/v262.10_classes.2s-15frames.bm.filter_dbscan_95/model_1/best_macro_f1_epoch_29.pth",
         ),
     ]
 )
@@ -68,6 +68,10 @@ for key, model_path in model_paths.items():
                 in_channels=384,
                 weight=0.2,
             ),
+            # Mặc định ProtoGCN dùng average_clips="prob" sẽ tự động áp dụng F.softmax() ở output.
+            # Đặt average_clips="score" để bỏ qua Softmax và chỉ xuất logits thô (raw scores),
+            # tương tự như đầu ra của SkateFormer.
+            test_cfg=dict(average_clips="score"),
         ),
     )
     load_checkpoint(model, model_path)
